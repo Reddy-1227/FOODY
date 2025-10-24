@@ -163,7 +163,7 @@ const [loading,setLoading]=useState(false)
     // Fetch rating summary for delivery boy
     (async()=>{
       try{
-        const res=await ratingAPI.getMyDeliveryRatings()
+        const res=await ratingAPI.getDeliveryRatings()
         setRatingSummary(res.data?.summary || { average:0, count:0 })
         setDeliveryRatings(res.data?.ratings || [])
       }catch(err){
