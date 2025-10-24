@@ -329,15 +329,28 @@ const SuperAdminDashboard = () => {
             return;
         }
 
+        // Prevent client-side duplicates (case-insensitive)
+        const normalizedName = newUserType.name.trim().toLowerCase();
+        const isDuplicate = userTypes.some(ut => (ut.name || '').trim().toLowerCase() === normalizedName);
+        if (isDuplicate) {
+            showMessage('User type already exists', 'error');
+            return;
+        }
+
         try {
             setLoading(true);
-            await superAdminAPI.createUserType(newUserType);
+            await superAdminAPI.createUserType({
+                name: newUserType.name.trim(),
+                description: newUserType.description,
+                deliveryAllowed: newUserType.deliveryAllowed
+            });
             showMessage('User type created successfully');
             setNewUserType({ name: '', description: '', deliveryAllowed: false });
             fetchUserTypes(); // Refresh the list
         } catch (error) {
             console.error('Error creating user type:', error);
-            showMessage('Error creating user type', 'error');
+            const msg = error?.response?.data?.message || 'Error creating user type';
+            showMessage(msg, 'error');
         } finally {
             setLoading(false);
         }

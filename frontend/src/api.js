@@ -1,44 +1,50 @@
-import axios from 'axios';
+import axios from 'axios'
 
-// Base configuration
-export const serverUrl = "http://localhost:8000";
-
-// Create axios instance with default configuration
 const api = axios.create({
-  baseURL: serverUrl,
-  withCredentials: true,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
+  baseURL: 'http://localhost:8000',
+  withCredentials: true
+})
+export const serverUrl = 'http://localhost:8000'
+
+// Helper to attach token if available
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('token')
+  if (token) {
+    config.headers['Authorization'] = `Bearer ${token}`
+  }
+  return config
+})
 
 // Auth API calls
 export const authAPI = {
-  signup: (userData) => api.post('/api/auth/signup', userData),
-  signin: (credentials) => api.post('/api/auth/signin', credentials),
+  signup: (data) => api.post('/api/auth/signup', data),
+  signin: (data) => api.post('/api/auth/signin', data),
   signout: () => api.get('/api/auth/signout'),
-  googleAuth: (googleData) => api.post('/api/auth/google-auth', googleData),
   sendOtp: (email) => api.post('/api/auth/send-otp', { email }),
   verifyOtp: (email, otp) => api.post('/api/auth/verify-otp', { email, otp }),
   resetPassword: (email, newPassword) => api.post('/api/auth/reset-password', { email, newPassword }),
+  googleAuth: (data) => api.post('/api/auth/google-auth', data),
   getUserTypes: () => api.get('/api/auth/user-types'),
-};
+}
 
 // User API calls
 export const userAPI = {
   getCurrentUser: () => api.get('/api/user/current'),
-  setActive: (isActive) => api.put('/api/user/set-active', { isActive }),
   updateLocation: (lat, lon) => api.post('/api/user/update-location', { lat, lon }),
-};
+  setActive: (isActive) => api.put('/api/user/set-active', { isActive }),
+}
 
 // Shop API calls
 export const shopAPI = {
+  addOrEdit: (formData) => api.post('/api/shop/create-edit', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
+  // Alias for components expecting createEdit()
   createEdit: (formData) => api.post('/api/shop/create-edit', formData, {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),
-  getAll: () => api.get('/api/shop/get-all'),
   getMy: () => api.get('/api/shop/get-my'),
-  updateStatus: (status) => api.put('/api/shop/update-status', { status }),
+  updateStatus: (isOpen) => api.put('/api/shop/update-status', { isOpen }),
 };
 
 // Item API calls
@@ -50,10 +56,10 @@ export const itemAPI = {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),
   getById: (itemId) => api.get(`/api/item/get-by-id/${itemId}`),
-  getByCity: (city) => api.get(`/api/item/get-by-city/${city}`),
+  getByCity: (city, params) => api.get(`/api/item/get-by-city/${city}`, { params }),
   getByShop: (shopId) => api.get(`/api/item/get-by-shop/${shopId}`),
   deleteItem: (itemId) => api.get(`/api/item/delete/${itemId}`),
-  updateStock: (itemId, inStock) => api.put(`/api/item/update-stock/${itemId}`, { inStock }),
+  updateStock: (itemId, stockStatus) => api.put(`/api/item/update-stock/${itemId}`, { stockStatus }),
   searchItems: (query, city) => api.get(`/api/item/search-items?query=${query}&city=${city}`),
 };
 

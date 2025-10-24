@@ -1,11 +1,18 @@
 import React from 'react'
 import { IoIosArrowRoundBack } from "react-icons/io";
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import CartItemCard from '../components/CartItemCard';
+import { syncCartPrices } from '../redux/userSlice';
 function CartPage() {
     const navigate = useNavigate()
-    const { cartItems, totalAmount } = useSelector(state => state.user)
+    const dispatch = useDispatch()
+    const { cartItems, totalAmount, itemsInMyCity } = useSelector(state => state.user)
+    React.useEffect(() => {
+        if (itemsInMyCity && itemsInMyCity.length) {
+            dispatch(syncCartPrices(itemsInMyCity))
+        }
+    }, [itemsInMyCity, dispatch])
     return (
         <div className='min-h-screen bg-[#fff9f6] flex justify-center p-6'>
             <div className='w-full max-w-[800px]'>

@@ -1,34 +1,33 @@
 import dotenv from 'dotenv'
 import { sendOtpMail } from './utils/mail.js'
 
-// Load environment variables
-dotenv.config()
+// Load environment variables from backend/.env explicitly when running from repo root
+dotenv.config({ path: './backend/.env' })
 
 async function testEmailOTP() {
   console.log('🧪 Testing OTP Email Functionality...')
   console.log('📧 Email Configuration:')
-  console.log(`   EMAIL: ${process.env.EMAIL}`)
-  console.log(`   PASS: ${process.env.PASS ? '***configured***' : 'NOT SET'}`)
+  console.log(`   EMAIL: ${process.env.EMAIL || process.env.SMTP_USER}`)
+  const passSet = (process.env.PASS || process.env.EMAIL_PASS || process.env.SMTP_PASS) ? '***configured***' : 'NOT SET'
+  console.log(`   PASS: ${passSet}`)
   console.log('')
 
-  // Test email address (you can change this to your email for testing)
-  const testEmail = 'test@example.com'
+  // Use configured email for testing, fallback to TEST_EMAIL if provided
+  const testEmail = process.env.TEST_EMAIL || process.env.EMAIL || process.env.SMTP_USER || 'test@example.com'
   const testOTP = '1234'
 
   try {
     console.log(`📤 Attempting to send test OTP to: ${testEmail}`)
     await sendOtpMail(testEmail, testOTP)
-    console.log('✅ Test completed! Check the console logs above for email sending status.')
+    console.log('✅ Test completed! Check your inbox (and spam folder).')
   } catch (error) {
     console.error('❌ Test failed:', error.message)
   }
 
   console.log('')
-  console.log('📋 Instructions for testing:')
-  console.log('1. Replace testEmail with your actual email address')
-  console.log('2. Run this script: node test-email-otp.js')
-  console.log('3. Check your email inbox (and spam folder)')
-  console.log('4. If using development mode, check console for OTP logs')
+  console.log('📋 Notes:')
+  console.log('• If using Gmail, ensure 2-Step Verification is ON and use an App Password.')
+  console.log('• SMTP settings are read from EMAIL/EMAIL_PASS or SMTP_USER/SMTP_PASS with SMTP_HOST/SMTP_PORT.')
 }
 
 testEmailOTP()

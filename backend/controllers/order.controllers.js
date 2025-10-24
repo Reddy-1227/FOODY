@@ -79,10 +79,11 @@ export const placeOrder = async (req, res) => {
             const items = groupItemsByShop[shopId]
             const subtotal = items.reduce((sum, i) => sum + Number(i.price) * Number(i.quantity), 0)
             const round2 = (n) => Math.round(n * 100) / 100
-            const ownerShare = round2(subtotal * 0.70)
-            const deliveryBoyShare = round2(subtotal * 0.80)
-            const superadminFee = round2(subtotal * 0.20)
-            const paymentFee = round2(subtotal * 0.02)
+            // Revenue split based on subtotal; extras added, not deducted from item price
+            const ownerShare = round2(subtotal * 0.70)            // Restaurant
+            const deliveryBoyShare = round2(subtotal * 0.20)      // Delivery Partner
+            const superadminFee = round2(subtotal * 0.08)         // Platform (You)
+            const paymentFee = round2(subtotal * 0.02)            // Payment/Tax
             return {
                 shop: shop._id,
                 owner: shop.owner._id,
@@ -110,16 +111,18 @@ export const placeOrder = async (req, res) => {
                     receipt: `receipt_${Date.now()}`
                 })
                 const round2 = (n) => Math.round(n * 100) / 100
+                // Compute order-level shares from subtotal, not grand total
+                const orderSubtotal = shopOrders.reduce((sum, so) => sum + (so.subtotal || 0), 0)
                 const newOrder = await Order.create({
                     user: req.userId,
                     paymentMethod,
                     deliveryAddress: orderType === "delivery" ? deliveryAddress : null,
                     orderType: orderType || "delivery",
                     totalAmount,
-                    ownerShare: round2(totalAmount * 0.70),
-                    deliveryBoyShare: round2(totalAmount * 0.80),
-                    superadminFee: round2(totalAmount * 0.20),
-                    paymentFee: round2(totalAmount * 0.02),
+                    ownerShare: round2(orderSubtotal * 0.70),
+                    deliveryBoyShare: round2(orderSubtotal * 0.20),
+                    superadminFee: round2(orderSubtotal * 0.08),
+                    paymentFee: round2(orderSubtotal * 0.02),
                     shopOrders,
                     razorpayOrderId: razorOrder.id,
                     payment: false
@@ -132,16 +135,18 @@ export const placeOrder = async (req, res) => {
             }
             // Fallback: create order without Razorpay, mark payment pending
             const round2 = (n) => Math.round(n * 100) / 100
+            // Compute order-level shares from subtotal, not grand total
+            const orderSubtotal = shopOrders.reduce((sum, so) => sum + (so.subtotal || 0), 0)
             const newOrder = await Order.create({
                 user: req.userId,
                 paymentMethod,
                 deliveryAddress: orderType === "delivery" ? deliveryAddress : null,
                 orderType: orderType || "delivery",
                 totalAmount,
-                ownerShare: round2(totalAmount * 0.70),
-                deliveryBoyShare: round2(totalAmount * 0.80),
-                superadminFee: round2(totalAmount * 0.20),
-                paymentFee: round2(totalAmount * 0.02),
+                ownerShare: round2(orderSubtotal * 0.70),
+                deliveryBoyShare: round2(orderSubtotal * 0.20),
+                superadminFee: round2(orderSubtotal * 0.08),
+                paymentFee: round2(orderSubtotal * 0.02),
                 shopOrders,
                 payment: false
             })
@@ -175,16 +180,18 @@ export const placeOrder = async (req, res) => {
         }
 
         const round2 = (n) => Math.round(n * 100) / 100
+        // Compute order-level shares from subtotal, not grand total
+        const orderSubtotal = shopOrders.reduce((sum, so) => sum + (so.subtotal || 0), 0)
         const newOrder = await Order.create({
             user: req.userId,
             paymentMethod,
             deliveryAddress: orderType === "delivery" ? deliveryAddress : null,
             orderType: orderType || "delivery",
             totalAmount,
-            ownerShare: round2(totalAmount * 0.70),
-            deliveryBoyShare: round2(totalAmount * 0.80),
-            superadminFee: round2(totalAmount * 0.20),
-            paymentFee: round2(totalAmount * 0.02),
+            ownerShare: round2(orderSubtotal * 0.70),
+            deliveryBoyShare: round2(orderSubtotal * 0.20),
+            superadminFee: round2(orderSubtotal * 0.08),
+            paymentFee: round2(orderSubtotal * 0.02),
             shopOrders
         })
 
@@ -336,7 +343,7 @@ export const getMyOrders = async (req, res) => {
         console.log('User found:', user.role, user.email)
         
         if (user.role == "user") {
-            const orders = await Order.find({ user: req.userId })
+            const orders = await Order.find({ user: req.userId, userDeleted: { $ne: true } })
                 .sort({ createdAt: -1 })
                 .populate("shopOrders.shop", "name")
                 .populate("shopOrders.owner", "fullName email mobile")
@@ -358,7 +365,9 @@ export const getMyOrders = async (req, res) => {
             console.log('Raw orders found for owner:', orders.length)
 
             const filteredOrders = orders.map((order => {
-                const ownerShopOrder = order.shopOrders.find(o => o.owner && o.owner._id.toString() === req.userId.toString())
+                const ownerShopOrder = order.shopOrders.find(o => 
+                    o.owner && o.owner._id.toString() === req.userId.toString() && !o.ownerDeleted
+                )
                 if (!ownerShopOrder) {
                     console.log('No matching shop order found for order:', order._id)
                     return null
@@ -385,14 +394,14 @@ export const getMyOrders = async (req, res) => {
             const orders = await Order.find({ "shopOrders.assignedDeliveryBoy": req.userId })
                 .sort({ createdAt: -1 })
                 .populate("shopOrders.shop", "name")
-                .populate("user", "fullName email mobile")
                 .populate("shopOrders.owner", "fullName email mobile")
+                .populate("user", "fullName email mobile")
                 .populate("shopOrders.shopOrderItems.item", "name image price")
                 .populate("shopOrders.assignedDeliveryBoy", "fullName mobile")
 
             const filteredOrders = orders.map((order => {
                 const deliveryBoyShopOrder = order.shopOrders.find(o => 
-                    o.assignedDeliveryBoy && o.assignedDeliveryBoy._id.toString() === req.userId.toString()
+                    o.assignedDeliveryBoy && o.assignedDeliveryBoy._id.toString() === req.userId.toString() && !o.deliveryBoyDeleted
                 )
                 if (!deliveryBoyShopOrder) return null
                 
@@ -1061,39 +1070,61 @@ export const deleteOrder = async (req, res) => {
             return res.status(404).json({ message: "User not found" })
         }
         
-        // Check permissions based on user role
+        // Enforce delivered-only deletion visibility per role
         if (user.role === "user") {
             // Users can only delete their own orders
             if (order.user.toString() !== userId) {
                 return res.status(403).json({ message: "You can only delete your own orders" })
             }
+            // Only allow delete after all shop orders are delivered
+            const allDelivered = order.shopOrders.every(so => so.status === 'delivered')
+            if (!allDelivered) {
+                return res.status(400).json({ message: "You can delete the order only after it is delivered" })
+            }
+            order.userDeleted = true
+            await order.save()
+            return res.status(200).json({ message: "Order hidden from your dashboard" })
         } else if (user.role === "owner") {
             // Owners can only delete orders for their shops
-            const hasOwnerShopOrder = order.shopOrders.some(shopOrder => 
-                shopOrder.owner.toString() === userId
-            )
-            if (!hasOwnerShopOrder) {
+            const ownerShopOrders = order.shopOrders.filter(so => so.owner && so.owner.toString() === userId)
+            if (ownerShopOrders.length === 0) {
                 return res.status(403).json({ message: "You can only delete orders for your shops" })
             }
+            const allDelivered = ownerShopOrders.every(so => so.status === 'delivered')
+            if (!allDelivered) {
+                return res.status(400).json({ message: "You can delete the order only after it is delivered" })
+            }
+            // Mark all matching shop orders as deleted for owner dashboard
+            order.shopOrders.forEach(so => {
+                if (so.owner && so.owner.toString() === userId) {
+                    so.ownerDeleted = true
+                }
+            })
+            await order.save()
+            return res.status(200).json({ message: "Order hidden from your dashboard" })
         } else if (user.role === "deliveryBoy") {
             // Delivery boys can only delete orders assigned to them
-            const hasAssignedOrder = order.shopOrders.some(shopOrder => 
-                shopOrder.assignedDeliveryBoy && shopOrder.assignedDeliveryBoy.toString() === userId
+            const assignedShopOrders = order.shopOrders.filter(so => 
+                so.assignedDeliveryBoy && so.assignedDeliveryBoy.toString() === userId
             )
-            if (!hasAssignedOrder) {
+            if (assignedShopOrders.length === 0) {
                 return res.status(403).json({ message: "You can only delete orders assigned to you" })
             }
+            const allDelivered = assignedShopOrders.every(so => so.status === 'delivered')
+            if (!allDelivered) {
+                return res.status(400).json({ message: "You can delete the order only after it is delivered" })
+            }
+            // Mark all matching shop orders as deleted for delivery boy dashboard
+            order.shopOrders.forEach(so => {
+                if (so.assignedDeliveryBoy && so.assignedDeliveryBoy.toString() === userId) {
+                    so.deliveryBoyDeleted = true
+                }
+            })
+            await order.save()
+            return res.status(200).json({ message: "Order hidden from your dashboard" })
         } else {
             return res.status(403).json({ message: "Invalid user role" })
         }
-        
-        // Delete related delivery assignments
-        await DeliveryAssignment.deleteMany({ order: orderId })
-        
-        // Delete the order
-        await Order.findByIdAndDelete(orderId)
-        
-        return res.status(200).json({ message: "Order deleted successfully" })
     } catch (error) {
         console.error("Delete order error:", error)
         return res.status(500).json({ message: `Delete order error: ${error}` })

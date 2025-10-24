@@ -64,15 +64,15 @@ export const submitRating = async (req, res) => {
       }
     }
 
-    // Upsert rating (allow editing like Swiggy/Zomato)
-    const rating = await Rating.findOneAndUpdate(
-      { type, target: targetId, order: orderId, user: req.userId },
-      { $set: { stars, comment, shopOrderId } },
-      { new: true, upsert: true }
-    )
+    // Enforce one-time rating: reject if already rated
+    const existing = await Rating.findOne({ type, target: targetId, order: orderId, user: req.userId })
+    if (existing) {
+      return res.status(400).json({ message: "You have already rated this for this order" })
+    }
+    const rating = await Rating.create({ type, target: targetId, order: orderId, user: req.userId, stars, comment, shopOrderId })
 
     await updateAggregate(type, targetId)
-    return res.status(200).json({ message: "Rating submitted", rating })
+    return res.status(201).json({ message: "Rating submitted", rating })
   } catch (error) {
     return res.status(500).json({ message: `submit rating error ${error}` })
   }

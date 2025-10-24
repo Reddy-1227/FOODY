@@ -6,24 +6,29 @@ import { MdDeliveryDining } from "react-icons/md";
 import { FaCreditCard } from "react-icons/fa";
 import { FaMobileScreenButton } from "react-icons/fa6";
 import { useNavigate } from 'react-router-dom';
-import { addMyOrder, clearCart } from '../redux/userSlice';
+import { addMyOrder, clearCart, syncCartPrices } from '../redux/userSlice';
 import { itemAPI, orderAPI } from '../api';
 
 function CheckOut() {
-  const { cartItems ,totalAmount} = useSelector(state => state.user)
+  const { cartItems ,totalAmount, itemsInMyCity } = useSelector(state => state.user)
   const [addressInput, setAddressInput] = useState("")
   const [phoneNumber, setPhoneNumber] = useState("")
   const [paymentMethod, setPaymentMethod] = useState("cod")
   const [orderType, setOrderType] = useState("delivery") // delivery or pickup
   const navigate=useNavigate()
   const dispatch = useDispatch()
+  useEffect(() => {
+    if (itemsInMyCity && itemsInMyCity.length) {
+      dispatch(syncCartPrices(itemsInMyCity))
+    }
+  }, [itemsInMyCity, dispatch])
   // Fee breakdown per your specification
   const round2 = (n) => Math.round(n * 100) / 100
   const ownerShare = round2(totalAmount)
-  const deliveryBoyShare = orderType === "delivery" ? round2(totalAmount * 0.08) : 0
-  const superadminFee = round2(totalAmount * 0.20)
+  const deliveryBoyShare = orderType === "delivery" ? round2(totalAmount * 0.10) : 0
+
   const paymentFee = paymentMethod === "online" ? round2(totalAmount * 0.02) : 0
-  const grandTotal = round2(ownerShare + deliveryBoyShare + superadminFee + paymentFee)
+  const grandTotal = round2(ownerShare + deliveryBoyShare + paymentFee)
 
   // Fetch shop UPI details (assumes single-shop cart; uses first item's shop)
   const [shopUpi, setShopUpi] = useState({ vpa: null, payeeName: null })
@@ -326,21 +331,18 @@ const openRazorpayWindow=(orderId,razorOrder)=>{
 ))}
  <hr className='border-gray-200 my-2'/>
 <div className='flex justify-between font-medium text-gray-800'>
-  <span>Subtotal (Owner Share)</span>
+  <span>Subtotal (Restaurant)</span>
   <span>{ownerShare}</span>
 </div>
 {orderType === "delivery" && (
   <div className='flex justify-between text-gray-700'>
-    <span>Delivery Boy Share (8%)</span>
+    <span>Delivery Partner (10%)</span>
     <span>{deliveryBoyShare}</span>
   </div>
 )}
+
 <div className='flex justify-between text-gray-700'>
-  <span>Superadmin Fee (20%)</span>
-  <span>{superadminFee}</span>
-</div>
-<div className='flex justify-between text-gray-700'>
-  <span>Payment Fee (2%) {paymentMethod!=="online" && "- COD"}</span>
+  <span>Payment/Tax (2%) {paymentMethod!=="online" && "- COD"}</span>
   <span>{paymentFee}</span>
 </div>
 <div className='flex justify-between text-lg font-bold text-[#ff4d2d] pt-2'>

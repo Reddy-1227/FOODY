@@ -312,29 +312,62 @@ const userSlice = createSlice({
     },
 
     clearPersistedOtpData: () => {
-      clearOtpDataFromLocalStorage();
+      localStorage.removeItem('deliveryOtpData');
+    },
+
+    syncCartPrices: (state, action) => {
+      const priceMap = action.payload
+      let changed = false
+      const findPrice = (id) => {
+        if (!priceMap) return null
+        if (Array.isArray(priceMap)) {
+          const f = priceMap.find(x => (x._id || x.id) == id)
+          return f ? Number(f.price) : null
+        }
+        if (typeof priceMap === 'object') {
+          const v = priceMap[id]
+          return v != null ? Number(v) : null
+        }
+        return null
+      }
+      state.cartItems = state.cartItems.map(ci => {
+        const latest = findPrice(ci.id)
+        if (latest != null && latest !== ci.price) {
+          changed = true
+          return { ...ci, price: latest }
+        }
+        return ci
+      })
+      if (changed) {
+        state.totalAmount = state.cartItems.reduce((sum, i) => sum + i.price * i.quantity, 0)
+        saveCartToLocalStorage(state.cartItems, state.totalAmount)
+      }
     },
 
     logout: (state) => {
-      state.userData = null;
-      state.currentCity = null;
-      state.currentState = null;
-      state.currentAddress = null;
-      state.shopInMyCity = null;
-      state.itemsInMyCity = null;
-      state.cartItems = [];
-      state.totalAmount = 0;
-      state.myOrders = [];
-      state.searchItems = null;
-      state.socket = null;
-      
-      // Clear localStorage
-      localStorage.removeItem('cartItems');
-      localStorage.removeItem('totalAmount');
-      clearOtpDataFromLocalStorage();
-    }
+      state.userData = null
+      state.currentCity = null
+      state.currentState = null
+      state.currentAddress = null
+      state.shopInMyCity = null
+      state.itemsInMyCity = null
+      state.cartItems = []
+      state.totalAmount = 0
+      state.myOrders = []
+      state.searchItems = null
+      state.socket = null
+      state.cartClearedForNewShop = false
+      // Clear localStorage on logout
+      try {
+        localStorage.removeItem('cartItems')
+        localStorage.removeItem('totalAmount')
+        localStorage.removeItem('deliveryOtpData')
+      } catch (error) {
+        console.error('Error clearing localStorage on logout:', error)
+      }
+    },
   }
 })
 
-export const { setUserData, setCurrentAddress, setCurrentCity, setCurrentState, setShopsInMyCity, setItemsInMyCity, addToCart, updateQuantity, removeCartItem, clearCart, clearCartNotification, setMyOrders, addMyOrder, updateOrderStatus, setSearchItems, setTotalAmount, setSocket, updateRealtimeOrderStatus, saveOtpData, clearPersistedOtpData, logout } = userSlice.actions
+export const { setUserData, setCurrentAddress, setCurrentCity, setCurrentState, setShopsInMyCity, setItemsInMyCity, addToCart, updateQuantity, removeCartItem, clearCart, clearCartNotification, setMyOrders, addMyOrder, updateOrderStatus, setSearchItems, setTotalAmount, setSocket, updateRealtimeOrderStatus, saveOtpData, clearPersistedOtpData, syncCartPrices, logout } = userSlice.actions
 export default userSlice.reducer

@@ -127,17 +127,36 @@ export const getShopByCity=async (req,res) => {
 // Update shop open/closed status
 export const updateShopStatus = async (req, res) => {
     try {
-        const { isOpen } = req.body
-        
-        if (typeof isOpen !== 'boolean') {
+        const { isOpen, status } = req.body
+
+        // Accept legacy "status" or string forms and coerce safely to boolean
+        let nextIsOpen
+        if (typeof isOpen === 'boolean') {
+            nextIsOpen = isOpen
+        } else if (typeof status === 'boolean') {
+            nextIsOpen = status
+        } else if (typeof status === 'string') {
+            const s = status.trim().toLowerCase()
+            if (["open", "opened", "true", "1"].includes(s)) nextIsOpen = true
+            else if (["close", "closed", "false", "0"].includes(s)) nextIsOpen = false
+        } else if (typeof isOpen === 'string') {
+            const s = isOpen.trim().toLowerCase()
+            if (["true", "1"].includes(s)) nextIsOpen = true
+            else if (["false", "0"].includes(s)) nextIsOpen = false
+        }
+
+        if (typeof nextIsOpen !== 'boolean') {
             return res.status(400).json({ message: "isOpen must be a boolean value" })
         }
         
         const shop = await Shop.findOneAndUpdate(
             { owner: req.userId }, 
-            { isOpen }, 
+            { isOpen: nextIsOpen }, 
             { new: true }
-        ).populate("owner")
+        ).populate("owner").populate({
+            path: "items",
+            options: { sort: { updatedAt: -1 } }
+        })
         
         if (!shop) {
             return res.status(404).json({ message: "Shop not found" })
@@ -154,7 +173,7 @@ export const updateShopStatus = async (req, res) => {
         }
         
         return res.status(200).json({ 
-            message: `Shop ${isOpen ? 'opened' : 'closed'} successfully`, 
+            message: `Shop ${nextIsOpen ? 'opened' : 'closed'} successfully`, 
             shop 
         })
         

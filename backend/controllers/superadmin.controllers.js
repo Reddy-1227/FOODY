@@ -271,16 +271,42 @@ export const getUserTypes = async (req, res) => {
 export const createUserType = async (req, res) => {
     try {
         const { name, description, deliveryAllowed } = req.body;
-        
-        const existingUserType = await UserType.findOne({ name });
-        if (existingUserType) {
+    
+        // Validate and normalize name
+        const normalizedName = (name || "").trim();
+        if (!normalizedName) {
+            return res.status(400).json({ message: "Name is required" });
+        }
+    
+        const nameRegex = new RegExp(`^${normalizedName}$`, 'i');
+    
+        // Block if an ACTIVE user type exists with same name (case-insensitive)
+        const existingActive = await UserType.findOne({ name: nameRegex, isActive: true });
+        if (existingActive) {
             return res.status(400).json({ message: "User type already exists" });
         }
-        
-        const userType = await UserType.create({ name, description, deliveryAllowed });
+    
+        // If an INACTIVE user type exists, restore it instead of creating a new one
+        const existingInactive = await UserType.findOne({ name: nameRegex, isActive: false });
+        if (existingInactive) {
+            existingInactive.description = description ?? existingInactive.description;
+            if (typeof deliveryAllowed === 'boolean') {
+                existingInactive.deliveryAllowed = deliveryAllowed;
+            }
+            existingInactive.isActive = true;
+            await existingInactive.save();
+            return res.status(200).json(existingInactive);
+        }
+    
+        // Otherwise, create brand new
+        const userType = await UserType.create({
+            name: normalizedName,
+            description,
+            deliveryAllowed
+        });
         res.status(201).json(userType);
     } catch (error) {
-        res.status(500).json({ message: `Error creating user type: ${error}` });
+        res.status(500).json({ message: `Error creating user type: ${error?.message || error}` });
     }
 };
 
@@ -316,11 +342,15 @@ export const updateUserTypeDelivery = async (req, res) => {
 export const deleteUserType = async (req, res) => {
     try {
         const { userTypeId } = req.params;
-        
-        await UserType.findByIdAndUpdate(userTypeId, { isActive: false });
+    
+        const deleted = await UserType.findByIdAndDelete(userTypeId);
+        if (!deleted) {
+            return res.status(404).json({ message: "User type not found" });
+        }
+    
         res.status(200).json({ message: "User type deleted successfully" });
     } catch (error) {
-        res.status(500).json({ message: `Error deleting user type: ${error}` });
+        res.status(500).json({ message: `Error deleting user type: ${error?.message || error}` });
     }
 };
 

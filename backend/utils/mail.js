@@ -2,26 +2,34 @@ import nodemailer from "nodemailer"
 import dotenv from "dotenv"
 dotenv.config()
 
-// Mailer initialization state
-const hasMailerCreds = !!(process.env.EMAIL && process.env.PASS)
+// Helper to resolve current env-based mail configuration
+const resolveMailEnv = () => {
+  const MAIL_USER = process.env.EMAIL || process.env.SMTP_USER
+  const MAIL_PASS = process.env.PASS || process.env.EMAIL_PASS || process.env.SMTP_PASS
+  const MAIL_HOST = process.env.SMTP_HOST || "smtp.gmail.com"
+  const MAIL_PORT = Number(process.env.SMTP_PORT || 465)
+  return { MAIL_USER, MAIL_PASS, MAIL_HOST, MAIL_PORT }
+}
+
 let transporter = null
 let mailerInitialized = false
 let mailerDisabledWarned = false
 
-// Attempt to create a Gmail transporter when creds exist
-if (hasMailerCreds) {
-  transporter = nodemailer.createTransport({
-    service: "Gmail",
-    port: 465,
-    secure: true,
-    auth: {
-      user: process.env.EMAIL,
-      pass: process.env.PASS,
-    },
-  })
-}
-
 const getTransporter = async () => {
+  // Lazily create transporter using the latest env values
+  if (!transporter) {
+    const { MAIL_USER, MAIL_PASS, MAIL_HOST, MAIL_PORT } = resolveMailEnv()
+    const hasMailerCreds = !!(MAIL_USER && MAIL_PASS)
+    if (hasMailerCreds) {
+      transporter = nodemailer.createTransport({
+        host: MAIL_HOST,
+        port: MAIL_PORT,
+        secure: MAIL_PORT === 465,
+        auth: { user: MAIL_USER, pass: MAIL_PASS },
+      })
+    }
+  }
+
   // Verify existing transporter once to avoid repeated login attempts
   if (transporter && !mailerInitialized) {
     try {
@@ -60,7 +68,7 @@ const getTransporter = async () => {
   if (!transporter && !mailerDisabledWarned) {
     mailerDisabledWarned = true
     console.warn(
-      "Email sending disabled. Provide valid EMAIL/PASS or set USE_TEST_MAIL=1 in .env for dev."
+      "Email sending disabled. Provide valid EMAIL/EMAIL_PASS or SMTP_USER/SMTP_PASS or set USE_TEST_MAIL=1 in .env for dev."
     )
   }
 
@@ -92,48 +100,28 @@ const safeSendMail = async (mailOptions) => {
   }
 }
 
-export const sendOtpMail = async (to, otp) => {
-  console.log(`[MAILER] Attempting to send OTP to: ${to}`)
-  
-  try {
-    const result = await safeSendMail({
-      from: process.env.EMAIL || "no-reply@foodway.dev",
-      to,
-      subject: "Reset Your Password - FOODWAY",
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #333;">Password Reset Request</h2>
-          <p>You have requested to reset your password for your FOODWAY account.</p>
-          <p>Your OTP for password reset is: <strong style="font-size: 24px; color: #ff6b35; background: #f5f5f5; padding: 10px; border-radius: 5px;">${otp}</strong></p>
-          <p style="color: #666;">This OTP will expire in 5 minutes.</p>
-          <p style="color: #666;">If you didn't request this password reset, please ignore this email.</p>
-        </div>
-      `,
-    })
-    
-    console.log(`[MAILER] OTP email sent successfully to: ${to}`)
-    
-    // Also log OTP in dev for ease of testing when real mail is disabled
-    if (!hasMailerCreds && process.env.USE_TEST_MAIL !== "1") {
-      console.log(`[DEV] Password Reset OTP for ${to}: ${otp}`)
-    }
-    
-    return result
-  } catch (error) {
-    console.error(`[MAILER] Failed to send OTP email to ${to}:`, error)
-    throw error
+export const sendOtpMail = async (email, otp) => {
+  const { MAIL_USER } = resolveMailEnv()
+  await safeSendMail({
+    from: MAIL_USER || "no-reply@foodway.dev",
+    to: email,
+    subject: "OTP",
+    html: `<p>Your OTP is <b>${otp}</b>. It expires in 5 minutes.</p>`,
+  })
+  if (process.env.USE_TEST_MAIL !== "1") {
+    console.log(`[DEV] OTP for ${email}: ${otp}`)
   }
 }
 
 export const sendDeliveryOtpMail = async (user, otp) => {
+  const { MAIL_USER } = resolveMailEnv()
   await safeSendMail({
-    from: process.env.EMAIL || "no-reply@foodway.dev",
+    from: MAIL_USER || "no-reply@foodway.dev",
     to: user.email,
     subject: "Delivery OTP",
     html: `<p>Your OTP for delivery is <b>${otp}</b>. It expires in 2 hours.</p>`,
   })
-  // Also log OTP in dev for ease of testing when real mail is disabled
-  if (!hasMailerCreds && process.env.USE_TEST_MAIL !== "1") {
+  if (process.env.USE_TEST_MAIL !== "1") {
     console.log(`[DEV] Delivery OTP for ${user.email}: ${otp}`)
   }
 }

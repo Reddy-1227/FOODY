@@ -77,10 +77,13 @@ lastOtpGeneratedAt:{
         type:Date,
         default:null
     },
-deliveredAt:{
+ deliveredAt:{
     type:Date,
     default:null
-}
+ },
+ // Per-role dashboard deletion flags
+ ownerDeleted: { type: Boolean, default: false },
+ deliveryBoyDeleted: { type: Boolean, default: false }
 
 }, { timestamps: true })
 
@@ -145,7 +148,9 @@ const orderSchema = new mongoose.Schema({
    specialInstructions: {
        type: String,
        default: null
-   }
+   },
+   // User dashboard deletion flag
+   userDeleted: { type: Boolean, default: false }
 }, { timestamps: true })
 
 // Pre-save middleware to generate sequential order ID
