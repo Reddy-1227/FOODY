@@ -1,109 +1,170 @@
-import React from 'react'
-import { useState } from 'react';
-import { FaRegEye } from "react-icons/fa";
-import { FaRegEyeSlash } from "react-icons/fa";
+import React, { useState } from "react";
+import { FaRegEye, FaRegEyeSlash } from "react-icons/fa";
 import { FcGoogle } from "react-icons/fc";
-import { useNavigate } from 'react-router-dom';
-import { authAPI } from '../api';
-import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
-import { auth } from '../../firebase';
-import { ClipLoader } from 'react-spinners';
-import { useDispatch } from 'react-redux';
-import { setUserData } from '../redux/userSlice';
+import { useNavigate } from "react-router-dom";
+import { authAPI } from "../api";
+import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
+import { auth } from "../../firebase";
+import { ClipLoader } from "react-spinners";
+import { useDispatch } from "react-redux";
+import { setUserData } from "../redux/userSlice";
+
 function SignIn() {
-    const primaryColor = "#ff4d2d";
-    const bgColor = "#fff9f6";
-    const borderColor = "#ddd";
-    const [showPassword, setShowPassword] = useState(false)
-    const navigate=useNavigate()
-    const [email,setEmail]=useState("")
-    const [password,setPassword]=useState("")
-    const [err,setErr]=useState("")
-    const [loading,setLoading]=useState(false)
-    const dispatch=useDispatch()
-     const handleSignIn=async () => {
-        setLoading(true)
-        try {
-            const result=await authAPI.signin({
-                email,password
-            })
-            if (result.status === 200) {
-              dispatch(setUserData(result.data))
-              setErr("")
-            } else {
-              const msg = result.data?.message || (result.status === 500 ? "Internal Server Error during sign-in" : "Sign-in failed")
-              setErr(msg)
-            }
-            setLoading(false)
-        } catch (error) {
-           // Should rarely hit here due to validateStatus; provide a safe message
-           setErr(error?.response?.data?.message || "Sign-in request error")
-           setLoading(false)
-        }
-     }
-     const handleGoogleAuth=async () => {
-        setLoading(true)
-        try {
-             const provider=new GoogleAuthProvider()
-             const result=await signInWithPopup(auth,provider)
-             
-             const {data}=await authAPI.googleAuth({
-                 email:result.user.email,
-             })
-             dispatch(setUserData(data))
-             setErr("")
-             setLoading(false)
-             navigate("/")
-        } catch (error) {
-             console.log(error)
-             setErr(error?.response?.data?.message || "Google sign-in failed")
-             setLoading(false)
-        }
-     }
-    return (
-        <div className='min-h-screen w-full flex items-center justify-center p-4' style={{ backgroundColor: bgColor }}>
-            <div className={`bg-white rounded-xl shadow-lg w-full max-w-md p-8 border-[1px] `} style={{
-                border: `1px solid ${borderColor}`
-            }}>
-                <h1 className={`text-3xl font-bold mb-2 `} style={{ color: primaryColor }}>FoodWay</h1>
-                <p className='text-gray-600 mb-8'> Sign In to your account to get started with delicious food deliveries
-                </p>
+  const navigate = useNavigate();
+  const dispatch = useDispatch();
 
-              
-                {/* email */}
+  const [showPassword, setShowPassword] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [err, setErr] = useState("");
+  const [loading, setLoading] = useState(false);
 
-                <div className='mb-4'>
-                    <label htmlFor="email" className='block text-gray-700 font-medium mb-1'>Email</label>
-                    <input type="email" className='w-full border rounded-lg px-3 py-2 focus:outline-none ' placeholder='Enter your Email' style={{ border: `1px solid ${borderColor}` }} onChange={(e)=>setEmail(e.target.value)} value={email} required/>
-                </div>
-                {/* password*/}
+  const handleSignIn = async () => {
+    setLoading(true);
+    setErr("");
+    try {
+      const result = await authAPI.signin({ email, password });
+      if (result.status === 200) {
+        dispatch(setUserData(result.data));
+        navigate("/");
+      } else {
+        setErr(result.data?.message || "Sign-in failed");
+      }
+    } catch (error) {
+      setErr(error?.response?.data?.message || "Sign-in request error");
+    }
+    setLoading(false);
+  };
 
-                <div className='mb-4'>
-                    <label htmlFor="password" className='block text-gray-700 font-medium mb-1'>Password</label>
-                    <div className='relative'>
-                        <input type={`${showPassword ? "text" : "password"}`} className='w-full border rounded-lg px-3 py-2 focus:outline-none pr-10' placeholder='Enter your password' style={{ border: `1px solid ${borderColor}` }} onChange={(e)=>setPassword(e.target.value)} value={password} required/>
+  const handleGoogleAuth = async () => {
+    setLoading(true);
+    setErr("");
+    try {
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, provider);
+      const { data } = await authAPI.googleAuth({ email: result.user.email });
+      dispatch(setUserData(data));
+      navigate("/");
+    } catch (error) {
+      console.log(error);
+      setErr(error?.response?.data?.message || "Google sign-in failed");
+    }
+    setLoading(false);
+  };
 
-                        <button className='absolute right-3 cursor-pointer top-[14px] text-gray-500' onClick={() => setShowPassword(prev => !prev)}>{!showPassword ? <FaRegEye /> : <FaRegEyeSlash />}</button>
-                    </div>
-                </div>
-                <div className='text-right mb-4 cursor-pointer text-[#ff4d2d] font-medium' onClick={()=>navigate("/forgot-password")}>
-                  Forgot Password
-                </div>
-              
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#fff2eb] via-[#ffe7db] to-[#ffd9c9] relative overflow-hidden px-4">
+      {/* Floating blobs for warm depth */}
+      <div className="absolute w-[26rem] h-[26rem] bg-[#fc8019]/25 rounded-full blur-3xl top-16 left-10 animate-pulse" />
+      <div className="absolute w-[26rem] h-[26rem] bg-[#ff2b85]/25 rounded-full blur-3xl bottom-12 right-10 animate-pulse" />
 
-            <button className={`w-full font-semibold py-2 rounded-lg transition duration-200 bg-[#ff4d2d] text-white hover:bg-[#e64323] cursor-pointer`} onClick={handleSignIn} disabled={loading}>
-                {loading?<ClipLoader size={20} color='white'/>:"Sign In"}
-            </button>
-      {err && <p className='text-red-500 text-center my-[10px]'>*{err}</p>}
-
-            <button className='w-full mt-4 flex items-center justify-center gap-2 border rounded-lg px-4 py-2 transition cursor-pointer duration-200 border-gray-400 hover:bg-gray-100' onClick={handleGoogleAuth}>
-<FcGoogle size={20}/>
-<span>Sign In with Google</span>
-            </button>
-            <p className='text-center mt-6 cursor-pointer' onClick={()=>navigate("/signup")}>Want to create a new account ?  <span className='text-[#ff4d2d]'>Sign Up</span></p>
-            </div>
+      {/* Auth card */}
+      <div className="relative w-full max-w-md bg-white/80 backdrop-blur-2xl border border-white/40 shadow-2xl rounded-3xl p-8 sm:p-10 transition-transform duration-300 hover:scale-[1.02]">
+        {/* Logo / Header */}
+        <div className="text-center mb-8">
+          <h1 className="text-5xl font-extrabold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-[#fc8019] to-[#ff2b85] drop-shadow-md">
+            Food<span className="text-[#ff2b85]">Way</span>
+          </h1>
+          <p className="text-gray-600 text-sm mt-2 font-medium">
+            Craving something tasty? Sign in to order now 🍔
+          </p>
         </div>
-    )
+
+        {/* Email */}
+        <div className="mb-5">
+          <label className="block text-gray-700 font-semibold mb-1 text-sm">
+            Email Address
+          </label>
+          <input
+            type="email"
+            placeholder="example@email.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            className="w-full border border-gray-300 rounded-xl px-4 py-2.5 bg-white/80 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#fc8019] hover:border-[#ff4d2d]/60 transition-all"
+          />
+        </div>
+
+        {/* Password */}
+        <div className="mb-5">
+          <label className="block text-gray-700 font-semibold mb-1 text-sm">
+            Password
+          </label>
+          <div className="relative">
+            <input
+              type={showPassword ? "text" : "password"}
+              placeholder="Enter your password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              className="w-full border border-gray-300 rounded-xl px-4 py-2.5 pr-10 bg-white/80 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#ff2b85] hover:border-[#ff4d2d]/60 transition-all"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((prev) => !prev)}
+              className="absolute right-3 top-2.5 text-gray-500 hover:text-[#ff2b85] transition"
+            >
+              {showPassword ? <FaRegEyeSlash /> : <FaRegEye />}
+            </button>
+          </div>
+        </div>
+
+        {/* Forgot Password */}
+        <div
+          className="text-right text-sm text-[#fc8019] font-medium mb-5 hover:underline cursor-pointer"
+          onClick={() => navigate("/forgot-password")}
+        >
+          Forgot Password?
+        </div>
+
+        {/* Sign In Button */}
+        <button
+          onClick={handleSignIn}
+          disabled={loading}
+          className="w-full bg-gradient-to-r from-[#fc8019] to-[#ff2b85] text-white py-3 rounded-xl font-semibold text-lg shadow-md hover:shadow-lg hover:scale-[1.03] transition-all duration-200 disabled:opacity-60"
+        >
+          {loading ? <ClipLoader size={22} color="white" /> : "Sign In"}
+        </button>
+
+        {/* Error */}
+        {err && (
+          <div className="mt-4 bg-red-100 border border-red-400 text-red-600 px-4 py-2 rounded-lg text-sm text-center font-medium shadow-sm">
+            {err}
+          </div>
+        )}
+
+        {/* Divider */}
+        <div className="flex items-center my-6">
+          <div className="flex-grow border-t border-gray-300" />
+          <span className="mx-3 text-gray-500 text-sm font-medium">or</span>
+          <div className="flex-grow border-t border-gray-300" />
+        </div>
+
+        {/* Google Auth */}
+        <button
+          onClick={handleGoogleAuth}
+          disabled={loading}
+          className="w-full flex items-center justify-center gap-3 border border-gray-300 py-3 rounded-xl bg-white hover:bg-[#fff9f7] hover:shadow-md transition-all"
+        >
+          <FcGoogle size={22} />
+          <span className="font-semibold text-gray-700">
+            Continue with Google
+          </span>
+        </button>
+
+        {/* Signup */}
+        <p className="text-center mt-6 text-gray-700 text-sm font-medium">
+          Don’t have an account?{" "}
+          <span
+            onClick={() => navigate("/signup")}
+            className="text-[#ff2b85] font-semibold cursor-pointer hover:underline"
+          >
+            Sign Up
+          </span>
+        </p>
+      </div>
+    </div>
+  );
 }
 
-export default SignIn
+export default SignIn;
