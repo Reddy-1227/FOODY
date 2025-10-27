@@ -79,6 +79,8 @@ export const orderAPI = {
   getCurrentOrders: () => api.get('/api/order/get-current-orders'),
   acceptOrder: (assignmentId) => api.get(`/api/order/accept-order/${assignmentId}`),
   getTodayDeliveries: () => api.get('/api/order/get-today-deliveries'),
+  getDeliveryCounts: () => api.get('/api/order/delivery-counts'),
+  getDeliveriesByDate: (year, month, day) => api.get('/api/order/get-deliveries-by-date', { params: { year, month, day } }),
 };
 
 // Rating API calls

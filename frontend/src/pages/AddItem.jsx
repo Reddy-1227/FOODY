@@ -113,7 +113,6 @@ function AddItem() {
       >
         <IoIosArrowRoundBack size={28} className="sm:size-[36px]" />
         <span className="text-sm sm:text-base font-medium hidden sm:inline">
-          Back
         </span>
       </div>
 

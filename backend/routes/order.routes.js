@@ -1,6 +1,6 @@
 import express from "express"
 import isAuth from "../middlewares/isAuth.js"
-import { acceptOrder, cancelOrder, deleteOrder, getCurrentOrder, getCurrentOrders, getDeliveryBoyAssignment, getMyOrders, getOrderById, getTodayDeliveries, placeOrder, sendDeliveryOtp, updateOrderStatus, updateSpecialInstructions, verifyDeliveryOtp, verifyPayment } from "../controllers/order.controllers.js"
+import { acceptOrder, cancelOrder, deleteOrder, getCurrentOrder, getCurrentOrders, getDeliveryBoyAssignment, getMyOrders, getOrderById, getTodayDeliveries, getDeliveryCounts, getDeliveriesByDate, placeOrder, sendDeliveryOtp, updateOrderStatus, updateSpecialInstructions, verifyDeliveryOtp, verifyPayment } from "../controllers/order.controllers.js"
 
 
 
@@ -19,6 +19,8 @@ orderRouter.post("/update-status/:orderId/:shopId",isAuth,updateOrderStatus)
 orderRouter.get('/accept-order/:assignmentId',isAuth,acceptOrder)
 orderRouter.get('/get-order-by-id/:orderId',isAuth,getOrderById)
 orderRouter.get('/get-today-deliveries',isAuth,getTodayDeliveries)
+orderRouter.get('/delivery-counts',isAuth,getDeliveryCounts)
+orderRouter.get('/get-deliveries-by-date',isAuth,getDeliveriesByDate)
 orderRouter.delete('/delete-order/:orderId',isAuth,deleteOrder)
 orderRouter.post('/cancel-order/:orderId',isAuth,cancelOrder)
 orderRouter.put('/update-special-instructions/:orderId',isAuth,updateSpecialInstructions)

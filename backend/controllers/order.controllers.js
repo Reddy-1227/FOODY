@@ -1052,6 +1052,72 @@ export const getTodayDeliveries=async (req,res) => {
     }
 }
 
+// Fetch deliveries for a given month and optional day for the logged-in delivery boy
+export const getDeliveriesByDate = async (req, res) => {
+    try {
+        const userId = req.userId
+        const { year, month, day } = req.query
+
+        const y = parseInt(year)
+        const m = parseInt(month) // 1-12
+        const d = day !== undefined ? parseInt(day) : undefined
+
+        if (!y || !m || m < 1 || m > 12) {
+            return res.status(400).json({ message: "year and month are required and must be valid" })
+        }
+
+        const start = new Date(y, m - 1, d ? d : 1, 0, 0, 0, 0)
+        const end = d ? new Date(y, m - 1, d + 1, 0, 0, 0, 0) : new Date(y, m, 1, 0, 0, 0, 0)
+
+        const deliveries = await Order.find({
+            "shopOrders.assignedDeliveryBoy": userId,
+            "shopOrders.status": "delivered",
+            createdAt: { $gte: start, $lt: end }
+        })
+        .populate("user", "fullName mobile")
+        .populate("shopOrders.shop", "name")
+
+        return res.status(200).json({
+            totalDeliveries: deliveries.length,
+            deliveries
+        })
+    } catch (error) {
+        return res.status(500).json({ message: `get deliveries by date error ${error}` })
+    }
+}
+
+// Get delivery counts: today, this month, and total for the logged-in delivery boy
+export const getDeliveryCounts = async (req, res) => {
+    try {
+        const userId = req.userId
+        const now = new Date()
+        const startOfToday = new Date(now)
+        startOfToday.setHours(0, 0, 0, 0)
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+
+        const total = await Order.countDocuments({
+            "shopOrders.assignedDeliveryBoy": userId,
+            "shopOrders.status": "delivered"
+        })
+
+        const month = await Order.countDocuments({
+            "shopOrders.assignedDeliveryBoy": userId,
+            "shopOrders.status": "delivered",
+            createdAt: { $gte: startOfMonth, $lt: now }
+        })
+
+        const today = await Order.countDocuments({
+            "shopOrders.assignedDeliveryBoy": userId,
+            "shopOrders.status": "delivered",
+            createdAt: { $gte: startOfToday, $lt: now }
+        })
+
+        return res.status(200).json({ total, month, today })
+    } catch (error) {
+        return res.status(500).json({ message: `get delivery counts error ${error}` })
+    }
+}
+
 // Function to automatically regenerate OTPs every 2 hours for undelivered orders
 export const deleteOrder = async (req, res) => {
     try {
