@@ -1,5 +1,97 @@
-- name: Deploy backend
-  run: npx serverless deploy
-  env:
-    DB_URI: ${{ secrets.DB_URI }}
-    FIREBASE_KEY: ${{ secrets.FIREBASE_KEY }}
+name: CI / Deploy (Frontend -> S3 + Backend -> Serverless)
+
+on:
+  push:
+    branches:
+      - main         # change to your production branch
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    env:
+      NODE_VERSION: '18'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      # ---------------------
+      # FRONTEND: build static assets
+      # ---------------------
+      - name: Install & build frontend
+        working-directory: ./frontend
+        run: |
+          npm ci
+          # inject build-time frontend vars here (only safe non-secrets, prefix with VITE_)
+          # Example: VITE_API_URL=https://api.example.com
+          npm run build
+        env:
+          # provide VITE_ prefixed envs here from GitHub Secrets if needed
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+
+      - name: Upload frontend build as artifact (optional)
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist
+
+      # ---------------------
+      # SYNC FRONTEND -> S3
+      # ---------------------
+      - name: Sync frontend to S3
+        uses: jakejarvis/s3-sync-action@v0.5.1
+        with:
+          args: --delete
+        env:
+          AWS_S3_BUCKET: ${{ secrets.AWS_S3_BUCKET }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      - name: Invalidate CloudFront cache
+        if: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID != '' }}
+        run: |
+          aws cloudfront create-invalidation --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} --paths "/*"
+        env:
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      # ---------------------
+      # BACKEND: Serverless deploy (Lambda + API Gateway)
+      # ---------------------
+      - name: Install backend dependencies
+        working-directory: ./backend
+        run: npm ci
+
+      - name: Install Serverless Framework (global) and CLI deps
+        run: |
+          npm ci               # ensures root devDependencies (serverless, plugins) are available if you keep them in root
+          npm i -g serverless  # optional global install so `serverless` works reliably
+
+      - name: Deploy backend (Serverless Framework)
+        working-directory: .
+        run: |
+          # Export the backend env vars for the deploy step so serverless.yml can reference them via ${env:VAR}
+          export MONGODB_URI="${{ secrets.MONGODB_URI }}"
+          export FIREBASE_API_KEY="${{ secrets.FIREBASE_API_KEY }}"
+          export OTHER_SECRET="${{ secrets.OTHER_SECRET }}"
+          # Deploy (uses AWS credentials below)
+          npx serverless deploy --stage prod --conceal
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+
+      - name: Post-deploy info
+        run: |
+          echo "Deployment finished. You can find your API endpoint(s) in the Serverless output above or in the AWS Console."
