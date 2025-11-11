@@ -1,23 +1,46 @@
-service: hrms-backend-lambda
+service: foody-backend
 
 provider:
   name: aws
-  runtime: nodejs18.x
-  region: us-east-1
-  environment:
-    MONGODB_URL: ${env:MONGODB_URL}
-    CLIENT_URL: ${env:CLIENT_URL}
-    JWT_SECRET: ${env:JWT_SECRET}
+  runtime: nodejs20.x
+  region: ap-south-1
 
 functions:
-  app:
-    handler: index.handler
+  api:
+    handler: app.handler
     events:
-      - httpApi: '*'
+      - httpApi:
+          path: /{proxy+}
+          method: ANY
 
-plugins:
-  - serverless-dotenv-plugin
+resources:
+  Resources:
+    FrontendBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: foody-frontend-bucket   # <--- you can change this name
+        WebsiteConfiguration:
+          IndexDocument: index.html
+          ErrorDocument: index.html
+        PublicAccessBlockConfiguration:
+          BlockPublicAcls: false
+          IgnorePublicAcls: false
+          BlockPublicPolicy: false
+          RestrictPublicBuckets: false
 
-custom:
-  dotenv:
-    path: .env
+    FrontendBucketPolicy:
+      Type: AWS::S3::BucketPolicy
+      Properties:
+        Bucket: foody-frontend-bucket
+        PolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            - Sid: PublicReadGetObject
+              Effect: Allow
+              Principal: "*"
+              Action: "s3:GetObject"
+              Resource: "arn:aws:s3:::foody-frontend-bucket/*"
+
+outputs:
+  WebsiteURL:
+    Value: !Sub "http://foody-frontend-bucket.s3-website-${AWS::Region}.amazonaws.com"
